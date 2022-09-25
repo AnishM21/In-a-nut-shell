@@ -1,0 +1,1 @@
+"yo moma" >> outpoutput.txt 
