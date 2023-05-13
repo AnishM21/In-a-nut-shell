@@ -94,3 +94,7 @@ Once the command is identified, flags and other arguments are stored and then fi
 3. The ```history.txt``` file is only updated when the ```exit``` command is used.
 4. The discover command will show the absolute path when ~ is given as the directory.
 5. The discover command does not show hidden files.  
+
+# ASSIGNMENT 3 NEW ADDITIONS:
+1. Control D and Control C have been accounted for. Upon using the control D command a prompt prints in a new line saying "Command D was detected" and returns control to the original shell used to run the 
+2. I/O redirection has been implemented in files <i>redirection.c</i> and <i>redirection.h</i>.

@@ -16,7 +16,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include "jobs.h"
+#include "sig_func.h"
+#include "fg.h"
+#include "piping.h"
 
 void execute();
+
+void execute_piping();
 
 #endif

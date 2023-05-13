@@ -9,4 +9,6 @@
 
 void redirection();
 
+void redirection_piping();
+
 #endif

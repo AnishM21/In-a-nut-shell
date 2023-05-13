@@ -2,8 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/utsname.h>
+#include <sys/types.h>
+#include <dirent.h>
 #include <time.h>
-
+#include <termios.h>
+#include <ctype.h>
+#include <unistd.h>
 #include "cd.h"
 #include "discover.h"
 #include "echo.h"
@@ -16,8 +20,11 @@
 #include "pwd.h"
 #include "redirection.h"
 #include "signalHandler.h"
+#include "piping.h"
 
 extern int errno;
+
+int shellPID;
 
 char firstInput[1000], input[1000][1000], command[100][1000];
 char decoy_pseudo_dir[1000];
@@ -31,17 +38,144 @@ char prevDir[1000];
 char pseudo_dir[1000];
 struct utsname check;
 char *buffer;
+// char hist_file_loc[strlen(cur_dir) + 13];
+char hist_file_loc[256];
 
-int main() {
+// autocompletion code
+void die(const char *s)
+{
+    perror(s);
+    exit(1);
+}
+
+struct termios orig_termios;
+
+void disableRawMode()
+{
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1)
+        die("tcsetattr");
+}
+
+/**
+ * Enable row mode for the terminal
+ * The ECHO feature causes each key you type to be printed to the terminal, so you can see what you’re typing.
+ * Terminal attributes can be read into a termios struct by tcgetattr().
+ * After modifying them, you can then apply them to the terminal using tcsetattr().
+ * The TCSAFLUSH argument specifies when to apply the change: in this case, it waits for all pending output to be written to the terminal, and also discards any input that hasn’t been read.
+ * The c_lflag field is for “local flags”
+ */
+void enableRawMode()
+{
+    if (tcgetattr(STDIN_FILENO, &orig_termios) == -1)
+        die("tcgetattr");
+    atexit(disableRawMode);
+    struct termios raw = orig_termios;
+    raw.c_lflag &= ~(ICANON | ECHO);
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
+        die("tcsetattr");
+}
+
+void autocomplete()
+{
+    int l = strlen(firstInput);
+    l--;
+    while (l >= 0 && (firstInput[l] != ' '))
+    {
+        l--;
+    }
+    l++;
+    int ptr = l;
+    char last_part[256] = {'\0'};
+    int i = 0;
+    while ((l < strlen(firstInput)))
+    {
+        last_part[i] = firstInput[l];
+        i++;
+        l++;
+    }
+    DIR *current_dir = opendir(".");
+    if (current_dir == NULL)
+    {
+        printf("Could not open directory\n");
+        return;
+    }
+
+    struct dirent *files;
+    int count = 0;
+    char options[50][256] = {'\0'};
+    while ((files = readdir(current_dir)) != NULL)
+    {
+        if (files->d_name[0] == '.')
+        {
+            continue;
+        }
+
+        if (strncmp(files->d_name, last_part, i) == 0)
+        {
+            strcpy(options[count], files->d_name);
+            count++;
+        }
+    }
+
+    if (count == 1)
+    {
+        strcpy(firstInput+ptr, options[0]);
+        // while (i < strlen(options[0]))
+        // {
+        //     firstInput[l] = options[0][i];
+        //     printf("%c", firstInput[l]);
+        //     l++;
+        //     i++;
+        // }
+    }
+    else if (count > 1)
+    {
+        int mini = 257;
+
+        for (int j = 0; j < count; j++)
+        {
+            int temp = strlen(options[j]);
+            if (temp < mini)
+            {
+                mini = temp;
+            }
+            printf("%s\n", options[j]);
+        }
+
+        for (int j = i; j < mini; j++)
+        {
+            int flag = 0;
+            for (int k = 1; k < count; k++)
+            {
+                if (options[k][j] != options[k - 1][j])
+                {
+                    flag = 1;
+                    break;
+                }
+            }
+            if (flag == 1)
+            {
+                break;
+            }
+            last_part[j] = options[0][j];
+        }
+
+        strcpy(firstInput + ptr, last_part);
+    }
+}
+
+int main()
+{
     // Initially checking host name and system name which shall only be run once during the execution
-    int total_number_of_commands = 0;  // To keep track of total number of commands
-
+    int total_number_of_commands = 0; // To keep track of total number of commands
+    shellPID = getpid();
     // readFromFile();
     // char *historyArray[20];
     // This is to control background and foreground processes count
     // int bg_counter = 0;
 
-    if (uname(&check) == -1) {
+    if (uname(&check) == -1)
+    {
         printf("Error!!");
         exit(1);
     }
@@ -51,12 +185,12 @@ int main() {
     strcpy(pseudo_dir, cur_dir);
     strcpy(decoy_pseudo_dir, pseudo_dir);
 
-    char hist_file_loc[strlen(cur_dir) + 13];
     strcpy(hist_file_loc, cur_dir);
     strcat(hist_file_loc, "/history.txt");
 
     FILE *fi_pt = fopen(hist_file_loc, "r");
-    if (fi_pt == NULL) {
+    if (fi_pt == NULL)
+    {
         fopen(hist_file_loc, "w");
     }
     fclose(fi_pt);
@@ -67,8 +201,11 @@ int main() {
 
     signal(SIGCHLD, bg_signal_handler);
     signal(SIGINT, cntrl_C_handler);
+    signal(SIGTSTP,SIG_IGN);
+    signal(SIGTSTP, cntrl_Z_handler);
 
-    while (1) {
+    while (1)
+    {
         // getcwd(cur_dir, 1000);
         // // printf("Previous directory-%s Current Directory-%s\n", prevDir, cur_dir);
 
@@ -113,9 +250,75 @@ int main() {
         // scanf(" %[^\n]s", firstInput);
 
         // int l = getc(stdin);
-        char *inp = fgets(firstInput, 1000, stdin);
 
-        if (inp == NULL) {
+        // char *inp = fgets(firstInput, 1000, stdin);
+
+        // TAKING IN INPUT FOR AUTOCOMPLETION
+        char c;
+        setbuf(stdout, NULL);
+        enableRawMode();
+        // printf("Prompt>");
+        memset(firstInput, '\0', 100);
+        int pt = 0;
+        while (read(STDIN_FILENO, &c, 1) == 1)
+        {
+            if (iscntrl(c))
+            {
+                if (c == 10)
+                    break;
+                else if (c == 27)
+                {
+                    char buf[3];
+                    buf[2] = 0;
+                    if (read(STDIN_FILENO, buf, 2) == 2)
+                    { // length of escape code
+                        printf("\rarrow key: %s", buf);
+                    }
+                }
+                else if (c == 127)
+                { // backspace
+                    if (pt > 0)
+                    {
+                        if (firstInput[pt - 1] == 9)
+                        {
+                            for (int i = 0; i < 7; i++)
+                            {
+                                printf("\b");
+                            }
+                        }
+                        firstInput[--pt] = '\0';
+                        printf("\b \b");
+                    }
+                }
+                else if (c == 9)
+                { // TAB character
+                    printf("\n");
+                    autocomplete();
+                    pt = strlen(firstInput);
+                    prompt();
+                    printf("%s", firstInput);
+                }
+                else if (c == 4)
+                {
+                    fflush(stdout);
+                    printf("\n");
+                    printf("Control D command detected\n");
+                    updateToFile(hist_file_loc);
+                    exit(0);
+                }
+            }
+            else
+            {
+                firstInput[pt++] = c;
+                printf("%c", c);
+            }
+        }
+        disableRawMode();
+        printf("\n");
+        // printf("\nInput Read: [%s]\n", firstInput);
+
+        if (firstInput == NULL)
+        {
             fflush(stdout);
             printf("\n");
             printf("Control D command detected\n");
@@ -123,9 +326,10 @@ int main() {
             exit(0);
         }
 
-        int len = strlen(inp);
-        if (inp[len - 1] == '\n') {
-            inp[len - 1] = '\0';
+        int len = strlen(firstInput);
+        if (firstInput[len - 1] == '\n')
+        {
+            firstInput[len - 1] = '\0';
         }
 
         // else
@@ -138,27 +342,44 @@ int main() {
         char temp_tok[3] = ";";
         char *temp = strtok(firstInput, temp_tok);
 
-        while (temp != NULL) {
+        while (temp != NULL)
+        {
             strcpy(input[com_count], temp);
             temp = strtok(NULL, temp_tok);
             com_count++;
         }
 
-        for (int i = 0; i < com_count; i++) {
+        for (int i = 0; i < com_count; i++)
+        {
             // Used to separate the semi-colon separated commands from each other and further split them up by removing spaces
             // strcpy(temp_tok, " ");
+            // if (checkPipes() == -1)
+            // {
+            //     continue;
+            // }
+
+            // checkPipes(i);
+
             char temp_tok2[3] = " \t";
             temp = strtok(input[i], temp_tok2);
             comm_count = 0;
 
-            while (temp != NULL) {
+            while (temp != NULL)
+            {
                 strcpy(command[comm_count], temp);
                 temp = strtok(NULL, temp_tok2);
                 comm_count++;
             }
 
-            for (int j = 0; j < comm_count; j++) {
-                if (strcmp(command[j], ">") == 0 || strcmp(command[j], "<") == 0 || strcmp(command[j], ">>") == 0) {
+            // if(checkPipes() != -1)
+            // {
+            //     continue;
+            // }
+
+            for (int j = 0; j < comm_count; j++)
+            {
+                if (strcmp(command[j], ">") == 0 || strcmp(command[j], "<") == 0 || strcmp(command[j], ">>") == 0)
+                {
                     // printf("Entered here\n");
                     redirection();
                     redirection_flag = 1;
@@ -166,7 +387,8 @@ int main() {
                 }
             }
 
-            if (redirection_flag != 1) {
+            if (redirection_flag != 1)
+            {
                 execute();
             }
 

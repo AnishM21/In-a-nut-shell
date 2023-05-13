@@ -1,20 +1,20 @@
-echo d >> output.txt
-echo h >> output.txt
-echo g >> output.txt
-sort < output.txt >> ans.txt
-sort < output.txt > ans.txt
-sort > output.txt
-sort < output.txt
-cat < output.txt
-cat < output.txt
-cat < output.txt
-sort < output.txt > ans.txt
-sort < ans.txt >> ans.txt
-sort < ans.txt
-sort < ans.txt >> ans.txt
-sort < ans.txt >> ans.txt
-sort < ans.txt > ans.txt
-sort < ans.txt >> ans.txt
-sort < ans.txt
-sort < ans.txt >> ans.txt
-sort < ans.txt >> ans.txt
+sig 2 9
+sig 3 9
+jobs
+gedit &
+sig 4 9
+sleep 10 & gedit & emacs &
+sig 2 9
+sig 3 9
+sig 1 9
+sleep 10 & gedit & emacs &
+sig 2 9
+sig 5 9
+sig 3 9
+gedit &
+sig 1 9
+sig 4 9
+sleep 10 & gedit &
+sig 2 9
+sleep 10 & gedit &
+sig 2 9

@@ -5,7 +5,6 @@ extern char decoy_pseudo_dir[1000];
 void pinfo_blank()
 {
     pid_t pid = getpid(); // To get the PID of the process
-
     char process_status[1000], exe_file[1000]; // To get the process status codes of given PID
     strcpy(process_status, "/proc/");
     strcpy(exe_file, "/proc");

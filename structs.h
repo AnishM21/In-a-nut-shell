@@ -13,8 +13,16 @@ struct process {
 };
 
 struct process fg_process;
-struct process* bg_process_list;
+struct process* proc_list_head;
+struct process* proc_list_next;
 
 void updateProcList(char* name, int pid);
-void deleteProc();
-void
+void deleteProc(int req_pid);
+struct process* getProcNameFromPID(int req_pid);
+struct process* getProcNameFromJobNum(int req_job_num);
+void processStatus(int req_pid);
+void processStatus_SFlag(int req_pid);
+void processStatus_RFlag(int req_pid);
+void printProcList();
+
+#endif

@@ -7,11 +7,12 @@ extern char prevDir[1000];
 extern char pseudo_dir[1000];
 extern struct utsname check;
 extern char* buffer;
+char sys_name[256];
 
 char *host_name()
 {
     char *bufer = malloc(256 * sizeof(char));
-    int hostname = gethostname(bufer, 256);
+    int hostname = getlogin_r(bufer, 256);
 
     if (hostname == -1)
     {
@@ -27,11 +28,12 @@ char *host_name()
 void prompt()
 {
     getcwd(cur_dir, 1000);
+    gethostname(sys_name, 256);
     // printf("Previous directory-%s Current Directory-%s\n", prevDir, cur_dir);
 
     if (strcmp(cur_dir, pseudo_dir) == 0)
     {
-        printf("<%s@%s:~>", buffer, check.sysname);
+        printf("<%s@%s:~>", buffer, sys_name);
     }
     else
     {
@@ -46,7 +48,7 @@ void prompt()
         }
         if (!finish)
         {
-            printf("<%s@%s:%s>", buffer, check.sysname, cur_dir);
+            printf("<%s@%s:%s>", buffer, sys_name, cur_dir);
         }
         else
         {
@@ -58,7 +60,7 @@ void prompt()
                 copy[u] = cur_dir[i];
                 u++;
             }
-            printf("<%s@%s:%s>", buffer, check.sysname, copy);
+            printf("<%s@%s:%s>", buffer, sys_name, copy);
         }
     }
 }

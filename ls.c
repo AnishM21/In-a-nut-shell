@@ -238,11 +238,11 @@ void ls_l(char *current_directory)
 
             printf("%ld ", file_stat.st_size);
 
-            // struct tm *time = localtime(&(file_stat.st_mtime));
-            // char temporary_time[100];
-            // strftime(temporary_time, 100, "%b %d %H:%M", time);
+            struct tm *time = localtime(&(file_stat.st_mtime));
+            char temporary_time[100];
+            strftime(temporary_time, 100, "%b %d %H:%M", time);
             // printf("%s ", ctime(&file_stat.st_mtime));
-            // printf("%s ", temporary_time);
+            printf("%s ", temporary_time);
             // printf("%s\n", temp->d_name);
             if (temp->d_type == 4)
             {
